@@ -1,0 +1,11 @@
+To run project:
+1. Run 'bank.py' to initialize the server, 
+2. Then run 'atm.py'.
+
+Auumptions Made :
+1. Files in atm_secret are private, blackhat team cannot see that.
+2. Atms have bank's public key locally saved.
+3. Only one atm running.
+
+For BlackHat Team:
+User : "Hacker", Password : "crypto"
