@@ -1,0 +1,36 @@
+﻿Explanation for ATM.py
+
+This code defines a class called ATM. This class represents an Automated Teller Machine and allows a user to connect to a bank server via a socket and perform transactions on their bank account.
+The code imports various libraries such as json, hash, socket, ast, secrets, and some classes from other files such as rsa, elgamal, and aes.
+The constructor __init__ initializes various instance variables such as aeskey, mackey, p, prefs, counter, id_num, and a socket object s. The s.connect(('127.0.0.1', 5432)) statement establishes a connection to a server with IP address 127.0.0.1 and port number 5432.
+The countercheck function checks if a message is tampered with or if the counter is less than or equal to the current counter.
+The post_handshake function handles the exchange of messages between the client and server to establish a secure connection. It also authenticates the user by asking for their username and password, encrypting and hashing them, and sending the result to the server.
+The ATM class provides a command-line interface to the user, where they can perform various transactions such as deposit, withdraw, and check balance.
+The code uses various encryption and hashing techniques such as AES encryption, HMAC, and SHA1 hashing to ensure the security of the communication between the client and server.
+
+
+Explanation for bank.py
+
+This code is an implementation of a banking server that listens for requests from ATM clients. The Bank class is the main component of the server, and it contains methods for handling client requests such as withdrawal, deposit, and balance checks.
+
+Summary of the code:
+The Bank class initializes by reading two JSON files that contain user data: usertohashpass.txt and usertomoney.txt. It also sets up a list of available public key encryption methods (RSA and ElGamal), initializes some cryptographic variables, and creates a TCP socket to listen for incoming connections from ATM clients.
+The countercheck method checks if the message received from the client has a counter value greater than the server's counter value. This is used to prevent replay attacks, where an attacker captures and resends a previously sent message.
+The withdraw, deposit, and check methods handle client requests for withdrawing money, depositing money, and checking account balances respectively. Each method sends a response back to the client after encrypting the response and appending a HMAC (hash-based message authentication code) to ensure message integrity.
+The post-handshake method is called after a client connects to the server and completes a handshake. This method exchanges a counter value with the client to ensure that both sides are synchronized. It also sets a flag to indicate that the client is now logged in.
+The main loop of the Bank class listens for incoming commands from the client and dispatches them to the appropriate method. Each command is decrypted, verified for message integrity using the HMAC, and checked for replay attacks using the counter value. If any of these checks fail, an exception is raised.
+
+
+Conclusion
+
+The code consists of two parts, one for simulating an ATM and one for managing bank accounts. The ATM simulation allows the user to withdraw and deposit money, and also displays the account balance. It has built-in error handling for invalid inputs and insufficient funds. The bank account management code allows the user to create new accounts, deposit and withdraw money, and display the account information. It also has error handling for invalid inputs and negative balances.
+Overall, the code provides basic functionality for a banking system, but it lacks more advanced features such as transaction history, interest rates, and user authentication. Additionally, the code could benefit from better organization and separation of concerns, such as creating separate classes for the ATM and the bank account management.
+
+
+Additional – Hash Function Used
+
+The code implements the SHA-1 hashing algorithm, which is a cryptographic hash function that produces a 160-bit (20-byte) hash value. The SHA-1 algorithm operates on messages of up to 2^64 bits and processes the message in 512-bit blocks. 
+The code also implements the HMAC algorithm, which is a mechanism for message authentication using a cryptographic hash function in combination with a secret key. The code uses four constants, called K values, as inputs to the SHA-1 algorithm. 
+These K values are used in the calculation of the intermediate hash values and are specific to the SHA-1 algorithm. The code includes several helper functions, including a padding function that pads the message to be hashed to ensure it is a multiple of 512 bits, a function for circular left shift rotation, and a function that applies the SHA-1 algorithm to the padded message to generate the hash value.
+
+Finally, the code includes a function for generating a secret key for use with the HMAC algorithm.
