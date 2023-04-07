@@ -11,6 +11,7 @@ class ATM:
     def __init__(self, preflist = []):
         self.aeskey = None
         self.mackey = None
+        #random large prime
         self.p = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
         if len(preflist) == 0:
             raise Exception("need to have preferences as the user to compare to server...")
@@ -18,7 +19,7 @@ class ATM:
         self.counter = 1
         self.id_num = 0
         self.s = socket.socket()
-        self.s.connect(('127.0.0.1', 5432))
+        self.s.connect(('127.0.0.1', 9999))
 
     def countercheck(self, msg):
         if(int(msg[0]) <= self.counter):
@@ -27,12 +28,13 @@ class ATM:
         self.counter = int(msg[0]) + 1
 
     def post_handshake(self):
+        #create a random number as the counter and send it (along with its proper hash)
         self.counter = secrets.randbelow(pow(2, 2048))
         sendstr = str(self.counter)
         sendstr = aes.encrypt(str(self.counter) + "-" + hash.hmac(sendstr, self.mackey), self.aeskey)
         self.s.send(sendstr.encode('utf-8'))
 
-        # Ensure bank correctly received our counter
+        # Ensure bank correctly received our counter....helps integrity
         bankret = self.s.recv(99999).decode('utf-8')
         bankret = aes.decrypt(bankret, self.aeskey)
         bankret = bankret.split('-')
@@ -54,6 +56,8 @@ class ATM:
             return
 
         print(f"Counter set, bank replied with '{bankret[0]}'")
+
+        #do log in and atm operations now
         print("ATM")
         username = ""
         password = ""
@@ -151,11 +155,13 @@ class ATM:
         self.s.close()
 
     def starthandshake(self):
+        #send off our preferences in greeting
         self.s.send((str(json.dumps(self.prefs))).encode('utf-8'))
 
         bankhello = self.s.recv(4096)
         scheme = bankhello.decode('utf-8')
 
+        #*PKC* 1.get some public and private keys based on the chosen PKC
         if scheme == "rsa":
             keypairs = rsa.load_keys("atm_secret/atm-rsa.txt", 4096)
             bankpubkey = rsa.load_public_key("atm_secret/bank-rsa.txt") # simulates the bank's public keys being hardcoded into the atm. This way if we chose to reset the bank key, we don't have to update this
@@ -165,16 +171,19 @@ class ATM:
         pubkey = keypairs[0]
         privkey = keypairs[1]
 
+        #*DH* send the server our private keys (used for calculating aes and mac key)
         print("Handshake info --> sending client random")
-
         dhprivateaes = secrets.randbelow(((self.p - 1) // 2) + 1)
         dhprivatemac = secrets.randbelow(((self.p - 1) // 2) + 1)
         dh_message = str(pow(2, dhprivateaes, self.p)) + '-' + str(pow(2, dhprivatemac, self.p))
         self.s.send(dh_message.encode('utf-8'))
 
+        #*digital signature* get the server-signed and plaintext DH-private keys
         clirandplain = self.s.recv(99999).decode('utf-8')
         self.s.send("recieved plaintext signature".encode('utf-8'))
         clirandsign = self.s.recv(4096).decode('utf-8')
+
+        #*digital signature* check if the server signed our stuff properly
         if scheme == 'rsa':
             clirandsign = rsa.verify_signature(int(clirandsign), clirandplain, bankpubkey)
         else:
@@ -191,8 +200,8 @@ class ATM:
             self.s.close()
             raise Exception("signature verify failed")
 
+        #*DH* compute actual aes and mac keys, based off of the private keys of the server and ours
         self.s.recv(4096) 
-
         print("Handshake info --> bank signature verified, DH parameters recieved")
         self.aeskey = pow(int(clirandplain[-2]), dhprivateaes, self.p) % pow(2,256)
         self.mackey = pow(int(clirandplain[-1]), dhprivatemac, self.p) % pow(2,256)
@@ -200,11 +209,13 @@ class ATM:
         self.mackey = format(self.mackey, '064x')
         print("Handshake info --> atm calculated aes/mac keys from DH exchange")
 
+        #*symmetric key crypto* every message we send to the server can now be encrypted and decrypted via actual aes key
         self.s.send((aes.encrypt("finished",self.aeskey)).encode('utf-8'))
         print(f"Handshake info --> ATM ready to go, bank replied {aes.decrypt(self.s.recv(1024).decode('utf-8'),self.aeskey)}")
 
         self.s.send(aes.encrypt(f'atm{self.id_num}', self.aeskey).encode('utf-8'))
 
+        #accept the server-issued challenge and try to pass it, based on the chosen PKC and PKC-private keys
         bank_challenge = aes.decrypt(self.s.recv(4096).decode('utf-8'), self.aeskey)
 
         if scheme == 'rsa':
