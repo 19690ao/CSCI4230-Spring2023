@@ -217,7 +217,6 @@ class ATM:
 
         #accept the server-issued challenge and try to pass it, based on the chosen PKC and PKC-private keys
         bank_challenge = aes.decrypt(self.s.recv(4096).decode('utf-8'), self.aeskey)
-
         if scheme == 'rsa':
             response = rsa.decrypt(int(bank_challenge), privkey)
         else:
@@ -226,9 +225,9 @@ class ATM:
             response = elgamal.decrypt(bank_challenge, privkey)
         response = hash.sha1(response + self.aeskey)
         self.s.send(aes.encrypt(response, self.aeskey).encode('utf-8'))
-
+        
         self.post_handshake()
 
 if __name__ == "__main__":
-    atmtest2 = ATM(["elgamal"])
+    atmtest2 = ATM(["rsa"])
     atmtest2.starthandshake() 

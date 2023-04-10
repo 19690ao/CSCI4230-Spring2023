@@ -12,7 +12,7 @@ class Bank:
         #get all the users and their associated hashes and their money
         self.usertopass = json.loads(open("atm_secret/usertohashpass.txt", "r").read()) 
         self.usertomoney = json.loads(open("atm_secret/usertomoney.txt", "r").read())
-        self.methods = ['elgamal'] 
+        self.methods = ['rsa'] 
         print("Public key methods in use by bank --> ", self.methods)
         self.aeskey = None
         self.mackey = None
@@ -239,8 +239,8 @@ class Bank:
 
         cliplain = clirand.split('-')
         #*DH* compute actual aes and mac keys, based off of the private keys of the client and ours
-        self.aeskey = pow(int(cliplain[0]), dhprivateaes, self.p) % pow(2,256)
-        self.mackey = pow(int(cliplain[1]), dhprivatemac, self.p) % pow(2,256)
+        self.aeskey = pow(int(cliplain[0]), dhprivateaes, self.p) % pow(2,256)  #do the extra mod 2^256 b/c we need length of 256 for AES-256 and SHA-256
+        self.mackey = pow(int(cliplain[1]), dhprivatemac, self.p) % pow(2,256)  
         self.aeskey = format(self.aeskey, '064x')
         self.mackey = format(self.mackey, '064x')
         print("Handshake info --> bank calculated aes/mac keys from DH exchange")
@@ -262,8 +262,7 @@ class Bank:
         except:
             self.client.close()
             raise Exception('client identifier is invalid')
-
-        self.client.send(aes.encrypt(str(challenge_encrypted), self.aeskey).encode('utf-8')) 
+        self.client.send(aes.encrypt(str(challenge_encrypted), self.aeskey).encode('utf-8'))  
 
         #if client response is good, accept them
         client_response = aes.decrypt(self.client.recv(1024).decode('utf-8'), self.aeskey)
