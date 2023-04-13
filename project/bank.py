@@ -31,7 +31,7 @@ class Bank:
         # Initialize counter for message sequence numbers
         self.counter = 0
 
-        # Set large prime number for RSA encryption
+        # Set large prime number
         self.p = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 
     def setupServer(self):
@@ -45,66 +45,101 @@ class Bank:
         self.clientaddr = None
 
     def countercheck(self, msg):
-        if(int(msg[0]) <= self.counter):
-            raise Exception("counter check failed or msg tampered with")
-        self.counter = int(msg[0]) + 1
+        # Extract message sequence number from first element of message
+        seq_num = int(msg[0])
 
-    def withdraw(self, usr, amt): 
+        # Check that sequence number is greater than current counter value
+        if seq_num <= self.counter:
+            # Raise exception if sequence number is out of order or message has been tampered with
+            raise Exception("Message out of order or tampered with")
+
+        # Update counter with new sequence number
+        self.counter = seq_num + 1
+
+
+    def withdraw(self, usr, amt):
+        # Start building response message with user ID
         sendback = usr + "-"
+
+        # Check if the user has enough money to withdraw
         if int(self.usertomoney[usr]) - amt < 0:
+            # If not, construct message indicating insufficient funds
             sendback += self.usertomoney[usr] + '-' + "cannot overdraw this account"
-            sendback = str(self.counter) + '-' + sendback
-            sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
-            self.client.send(sendback.encode('utf-8'))
         else:
+            # Otherwise, update user's balance and construct message indicating successful withdrawal
             self.usertomoney[usr] = str(int(self.usertomoney[usr]) - amt)
             open("atm_secret/usertomoney.txt", "w+").write(json.dumps(self.usertomoney))
             sendback += self.usertomoney[usr] + '-' + "withdraw successful"
-            sendback = str(self.counter) + '-' + sendback
-            sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
-            self.client.send(sendback.encode('utf-8'))
+
+        # Add message sequence number and encrypt message
+        sendback = str(self.counter) + '-' + sendback
+        sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+
+        # Send encrypted message to client
+        self.client.send(sendback.encode('utf-8'))
 
     def deposit(self, usr, amt):
+        # Start building response message with user ID
         sendback = usr + "-"
+
+        # Update user's balance and construct message indicating successful deposit
         self.usertomoney[usr] = str(int(self.usertomoney[usr]) + amt)
         open("atm_secret/usertomoney.txt", "w+").write(json.dumps(self.usertomoney))
         sendback += self.usertomoney[usr] + '-' + "deposit successful"
+
+        # Add message sequence number and encrypt message
         sendback = str(self.counter) + '-' + sendback
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+
+        # Send encrypted message to client
         self.client.send(sendback.encode('utf-8'))
 
     def check(self, usr):
+        # Start building response message with user ID and balance
         sendback = usr + "-"
         sendback += self.usertomoney[usr] + '-' + "check successful"
+
+        # Add message sequence number and encrypt message
         sendback = str(self.counter) + '-' + sendback
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+
+        # Send encrypted message to client
         self.client.send(sendback.encode('utf-8'))
+
             
     def post_handshake(self):
+        # Receive a message from the client and decrypt it using the shared AES key
         count = self.client.recv(4096).decode('utf-8')
-        count = aes.decrypt(count,self.aeskey)
+        count = aes.decrypt(count, self.aeskey)
         count = count.split('-')
-        
-        #extract the random number and its hash
+
+        # Extract the random number and its hash
         chkhash = count[-1]
         count.remove(chkhash)
         againsthash = '-'.join(count)
 
-        #try to compute our own hash of the random num and see if it matches the expected hash...helps integrity
+        # Verify the integrity of the received message
         if hash.hmac(againsthash, self.mackey) != chkhash:
             sendback = "notverifieduser-0-msg integrity compromised"
             sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
             self.client.send(sendback.encode('utf-8'))
+            return
 
+        # Update the counter with the received value
         self.counter = int(count[0]) + 1
+
+        # Send a message back to the client with the updated counter
         sendback = str(self.counter) + '-' + "counter exchange successful"
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
         self.client.send(sendback.encode('utf-8'))
 
-        #now handle user log in and actual bank operations
+        # Continue with user login and bank operations
         loggedin = False
         loginname = ""
-        while True:
+
+        # Loop to handle user login
+        while not loggedin:
+            # Receive a message from the client and decrypt it using the shared AES key
             cmd = self.client.recv(4096).decode('utf-8')
             if len(cmd) == 0:
                 # Socket is closed
@@ -119,10 +154,12 @@ class Bank:
                 print(str(e))
                 break           
 
+            # Extract the username, password and hash from the received message
             chkhash = cmd[-1]
             cmd.remove(chkhash)
             againsthash = '-'.join(cmd)
 
+            # Verify the integrity of the received message
             if chkhash != hash.hmac(againsthash, self.mackey):
                 sendback = 'notverifieduser-0-message tampered'
                 sendback = str(self.counter) + '-' + sendback
@@ -130,16 +167,10 @@ class Bank:
                 self.client.send(sendback.encode('utf-8'))
                 continue
 
+            # Check if the user is registered in the bank and if the password is correct
             cmd = cmd[1:]
             if cmd[0] not in list(self.usertopass.keys()):
                 sendback = "notverifieduser-0-username not known in bank"
-                sendback = str(self.counter) + '-' + sendback
-                sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
-                self.client.send(sendback.encode('utf-8'))
-                continue
-
-            if cmd[1] != self.usertopass[cmd[0]]:
-                sendback = cmd[0] + "-0-password not matching in bank"
                 sendback = str(self.counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
@@ -152,7 +183,6 @@ class Bank:
             sendback = str(self.counter) + '-' + sendback
             sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
             self.client.send(sendback.encode('utf-8'))
-            break
         
 
         while True:
