@@ -97,7 +97,7 @@ class ATM:
 
         while True:
             inp = input("command: ")
-            inp = inp.strip()
+            inp = inp.strip().lower()
             if inp == 'q':
                 break
 
@@ -109,19 +109,19 @@ class ATM:
                 continue
 
             # Parse user input
-            if inp[0].lower() == 'withdraw':
-                sendstr += inp[0].lower()
-            elif inp[0].lower() == 'deposit':
-                sendstr += inp[0].lower()
-            elif inp[0].lower() == 'check':
-                sendstr += inp[0].lower()
+            if inp[0] == 'withdraw':
+                sendstr += inp[0]
+            elif inp[0] == 'deposit':
+                sendstr += inp[0]
+            elif inp[0] == 'check':
+                sendstr += inp[0]
             else:
                 print("not a valid operation supported by bank")
                 continue
 
             if inp[1].isnumeric() and int(inp[1]) > 0:
                 sendstr += '-' + inp[1]
-            elif inp[0].lower() == 'check' and inp[1].lower() == 'balance':
+            elif inp[0] == 'check' and inp[1] == 'balance':
                 sendstr += '-' + inp[1]
             else:
                 print("invalid money amount")
