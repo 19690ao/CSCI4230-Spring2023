@@ -225,8 +225,6 @@ class Bank:
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
 
-
-
     def post_handshake(self):
         # Receive a message from the client and decrypt it using the shared AES key
         count = self.client.recv(4096).decode('utf-8')
