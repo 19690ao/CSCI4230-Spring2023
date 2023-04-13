@@ -56,7 +56,6 @@ class Bank:
         # Update counter with new sequence number
         self.counter = seq_num + 1
 
-
     def withdraw(self, usr, amt):
         # Start building response message with user ID
         sendback = usr + "-"
@@ -143,7 +142,7 @@ class Bank:
                 self.client.send(sendback.encode('utf-8'))
                 continue
 
-            # Check if the user is registered in the bank and if the password is correct
+            # Check if the user is registered in the bank
             cmd = cmd[1:]
             username = cmd[0]
             if username not in self.usertopass:
@@ -153,6 +152,7 @@ class Bank:
                 self.client.send(sendback.encode('utf-8'))
                 continue
 
+            # Check if the password is correct
             password = cmd[1]
             if password != self.usertopass[username]:
                 sendback = username + "-0-password not matching in bank"
@@ -175,18 +175,22 @@ class Bank:
     def handleBanking(self, loggedin, loginname):
         # Loop to handle incoming commands from the client and execute them
         while True:
+            # Receive a message from the client and decrypt it using the shared AES key
             cmd = self.client.recv(4096).decode('utf-8')
             if len(cmd) == 0:
                 break
 
+            # Decrypt the received message and split it into its components
             cmd = aes.decrypt(cmd,self.aeskey)
             cmd = cmd.split('-')
+
             try:
-                self.countercheck(cmd)
+                self.countercheck(cmd)  # Check if the counter in the message is valid
             except Exception as e:
                 print(str(e))
                 break           
 
+            # Verify the integrity of the received message
             chkhash = cmd[-1]
             cmd.remove(chkhash)
             againsthash = '-'.join(cmd)
@@ -199,6 +203,7 @@ class Bank:
                 self.client.send(sendback.encode('utf-8'))
                 continue
 
+            # Check if the user is registered in the bank
             if cmd[0] not in list(self.usertopass.keys()):
                 sendback = "notverifieduser-0-username not known in bank(tampered name error)"
                 sendback = str(self.counter) + '-' + sendback
@@ -206,6 +211,7 @@ class Bank:
                 self.client.send(sendback.encode('utf-8'))
                 continue
 
+            # Execute the requested banking command if the user is logged in
             if cmd[1] == 'withdraw' and loggedin:
                 self.withdraw(cmd[0], int(cmd[2]))
             elif cmd[1] == 'deposit' and loggedin:
@@ -218,6 +224,7 @@ class Bank:
                 sendback = str(self.counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
+
 
 
     def post_handshake(self):
