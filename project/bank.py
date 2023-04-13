@@ -171,35 +171,9 @@ class Bank:
             self.client.send(sendback.encode('utf-8'))
         
         return loggedin, loginname
-            
-    def post_handshake(self):
-        # Receive a message from the client and decrypt it using the shared AES key
-        count = self.client.recv(4096).decode('utf-8')
-        count = aes.decrypt(count, self.aeskey)
-        count = count.split('-')
-
-        # Extract the random number and its hash
-        chkhash = count[-1]
-        count.remove(chkhash)
-        againsthash = '-'.join(count)
-
-        # Verify the integrity of the received message
-        if hash.hmac(againsthash, self.mackey) != chkhash:
-            sendback = "notverifieduser-0-msg integrity compromised"
-            sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
-            self.client.send(sendback.encode('utf-8'))
-            return
-
-        # Update the counter with the received value
-        self.counter = int(count[0]) + 1
-
-        # Send a message back to the client with the updated counter
-        sendback = str(self.counter) + '-' + "counter exchange successful"
-        sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
-        self.client.send(sendback.encode('utf-8'))
-
-        loggedin, loginname = self.handleLogin()
-        
+    
+    def handleBanking(self, loggedin, loginname):
+        # Loop to handle incoming commands from the client and execute them
         while True:
             cmd = self.client.recv(4096).decode('utf-8')
             if len(cmd) == 0:
@@ -244,7 +218,38 @@ class Bank:
                 sendback = str(self.counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
-            
+
+
+    def post_handshake(self):
+        # Receive a message from the client and decrypt it using the shared AES key
+        count = self.client.recv(4096).decode('utf-8')
+        count = aes.decrypt(count, self.aeskey)
+        count = count.split('-')
+
+        # Extract the random number and its hash
+        chkhash = count[-1]
+        count.remove(chkhash)
+        againsthash = '-'.join(count)
+
+        # Verify the integrity of the received message
+        if hash.hmac(againsthash, self.mackey) != chkhash:
+            sendback = "notverifieduser-0-msg integrity compromised"
+            sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+            self.client.send(sendback.encode('utf-8'))
+            return
+
+        # Update the counter with the received value
+        self.counter = int(count[0]) + 1
+
+        # Send a message back to the client with the updated counter
+        sendback = str(self.counter) + '-' + "counter exchange successful"
+        sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+        self.client.send(sendback.encode('utf-8'))
+
+        loggedin, loginname = self.handleLogin()
+        
+        self.handleBanking(loggedin, loginname)
+
         self.s.close()
 
     def starthandshake(self): 
