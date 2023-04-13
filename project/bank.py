@@ -258,11 +258,15 @@ class Bank:
         self.s.close()
 
     def starthandshake(self): 
-        #a client has connected, get their preferences
+        # Hang until a client has connected
+        # accept incoming client connection
         self.client, self.clientaddr = self.s.accept()
+        # receive client hello message containing the client's preferences for encryption schemes
         clienthello = self.client.recv(1024)
+        # split the message by '-' and parse the JSON message
         clienthello = clienthello.decode('utf-8').split('-')
         atmprefs = json.loads(clienthello[0])
+        # print message indicating ATM is initiating handshake with BANK server
         print("ATM has initiated handshake, hello to BANK server!")
 
         #choose a common PKC and make sure the client knows. currently support rsa and elgamal
