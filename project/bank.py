@@ -163,7 +163,7 @@ class Bank:
             if chkhash != hash.hmac(againsthash, self.mackey):
                 sendback = 'notverifieduser-0-message tampered'
                 sendback = str(self.counter) + '-' + sendback
-                senback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+                sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
                 continue
 
