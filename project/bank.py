@@ -20,6 +20,9 @@ class Bank:
         self.usertopass = json.loads(open("atm_secret/usertohashpass.txt", "r").read()) 
         self.usertomoney = json.loads(open("atm_secret/usertomoney.txt", "r").read())
 
+        # Setup counters for failed login attempts
+        self.failedlogins = {username: 0 for username in self.usertopass.keys()}
+
         # Set up public key encryption methods
         self.methods = ['rsa'] 
         print("Public key methods in use by bank --> ", self.methods)
@@ -151,6 +154,14 @@ class Bank:
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
                 continue
+            
+            # Check if the account is locked
+            if self.failedlogins[username] >= 5:
+                sendback = "notverifieduser-0-account locked (too many login attempts)"
+                sendback = str(self.counter) + '-' + sendback
+                sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
+                self.client.send(sendback.encode('utf-8'))
+                continue
 
             # Check if the password is correct
             password = cmd[1]
@@ -159,6 +170,7 @@ class Bank:
                 sendback = str(self.counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
+                self.failedlogins[username] += 1
                 continue
 
             # Login successful
