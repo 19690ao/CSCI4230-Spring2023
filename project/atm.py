@@ -166,7 +166,7 @@ class ATM:
             keypairs = rsa.load_keys("atm_secret/atm-rsa.txt", 4096)
             bankpubkey = rsa.load_public_key("atm_secret/bank-rsa.txt") # simulates the bank's public keys being hardcoded into the atm. This way if we chose to reset the bank key, we don't have to update this
         else:
-            keypairs = elgamal.load_keys("atm_secret/atm-elgamal.txt", 2048)
+            keypairs = elgamal.load_keys("atm_secret/atm-elgamal.txt", 4096)
             bankpubkey = elgamal.load_public_key("atm_secret/bank-elgamal.txt") # see above
         pubkey = keypairs[0]
         privkey = keypairs[1]
@@ -217,8 +217,10 @@ class ATM:
 
         #accept the server-issued challenge and try to pass it, based on the chosen PKC and PKC-private keys
         bank_challenge = aes.decrypt(self.s.recv(4096).decode('utf-8'), self.aeskey)
+        #print(f"TEMP: {bank_challenge}")
         if scheme == 'rsa':
             response = rsa.decrypt(bank_challenge, privkey)
+            #print(f"TEMP a2: {response}")
         else:
             bank_challenge = bank_challenge.strip('(').strip(')').split(',')
             bank_challenge = [int(c) for c in bank_challenge]

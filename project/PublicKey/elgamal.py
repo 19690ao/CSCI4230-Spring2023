@@ -2,6 +2,7 @@ import PublicKey.utils as utils
 import hash
 import secrets
 from math import gcd
+from random import randint
 
 
 def load_keys(filename: str, bitsize: int) -> tuple:
@@ -40,6 +41,28 @@ def load_public_key(filename: str) -> tuple:
     f.close()
     return (p, alpha, beta)
 
+def modinv(a, p):
+    """
+    Returns the modular inverse of a modulo p, if it exists.
+    """
+    # Compute gcd(a, p) and check if a is invertible
+    gcd, x, _ = xgcd(a, p)
+    if gcd != 1:
+        raise ValueError(f"{a} is not invertible modulo {p}")
+    else:
+        return x % p
+
+def xgcd(a, b):
+    """
+    Extended Euclidean algorithm. Returns gcd(a, b), x, and y
+    such that ax + by = gcd(a, b).
+    """
+    x0, x1, y0, y1 = 1, 0, 0, 1
+    while b != 0:
+        q, a, b = a // b, b, a % b
+        x0, x1 = x1, x0 - q * x1
+        y0, y1 = y1, y0 - q * y1
+    return a, x0, y0
 
 def generate_keys(bitsize: int) -> tuple:
     p = 4
@@ -63,7 +86,6 @@ def generate_keys(bitsize: int) -> tuple:
     priv_key = (p, a)
     return (pub_key, priv_key)
 
-
 def encrypt(msg: str, pub_key: tuple) -> tuple:
     msg = utils.str_to_num(msg)
     p, alpha, beta = pub_key
@@ -77,8 +99,16 @@ def decrypt(msg: tuple, priv_key: tuple) -> str:
     y1, y2 = msg
     p, a = priv_key
 
-    decrypted = pow(y1, a, p)
-    decrypted = (y2 * pow(decrypted, -1, p)) % p
+    # Compute (y1 ** a) % p
+    shared_secret = pow(y1, a, p)
+
+    # Compute the modular inverse of shared_secret
+    shared_secret_inv = modinv(shared_secret, p)
+
+    # Decrypt the message by multiplying y2 with the modular inverse of shared_secret
+    decrypted = (y2 * shared_secret_inv) % p
+
+    # Convert the decrypted integer to a string representation of the original message
     return utils.num_to_str(decrypted, p.bit_length())
 
 
@@ -96,7 +126,8 @@ def sign(msg: str, priv_key: tuple, pub_key: tuple) -> tuple:
             k = secrets.randbelow(p-1)
 
         r = pow(alpha, k, p)
-        s = ((hashed - a*r) * pow(k, -1, p-1)) % (p-1)
+        k_inv = modinv(k, p-1)
+        s = ((hashed - a*r) * k_inv) % (p-1)
 
     return (r, s)
 
