@@ -86,7 +86,6 @@ def generate_keys(bitsize: int) -> tuple:
     priv_key = (p, a)
     return (pub_key, priv_key)
 
-
 def encrypt(msg: str, pub_key: tuple) -> tuple:
     msg = utils.str_to_num(msg)
     p, alpha, beta = pub_key
@@ -100,8 +99,16 @@ def decrypt(msg: tuple, priv_key: tuple) -> str:
     y1, y2 = msg
     p, a = priv_key
 
-    decrypted = modinv(pow(y1, a, p), p)
-    decrypted = (y2 * decrypted) % p
+    # Compute (y1 ** a) % p
+    shared_secret = pow(y1, a, p)
+
+    # Compute the modular inverse of shared_secret
+    shared_secret_inv = modinv(shared_secret, p)
+
+    # Decrypt the message by multiplying y2 with the modular inverse of shared_secret
+    decrypted = (y2 * shared_secret_inv) % p
+
+    # Convert the decrypted integer to a string representation of the original message
     return utils.num_to_str(decrypted, p.bit_length())
 
 
@@ -119,7 +126,6 @@ def sign(msg: str, priv_key: tuple, pub_key: tuple) -> tuple:
             k = secrets.randbelow(p-1)
 
         r = pow(alpha, k, p)
-        #k_inv = pow(k, -1, p-1)
         k_inv = modinv(k, p-1)
         s = ((hashed - a*r) * k_inv) % (p-1)
 
