@@ -1,29 +1,27 @@
 import PublicKey.utils as utils
 import hash
+import random
 import secrets
+import string
 from math import gcd
-from random import randint
 
 
 def load_keys(filename: str, bitsize: int) -> tuple:
     try:
+        pub_count = 3
         f = open(filename, 'r')
         lines = f.readlines()
 
         p = int(lines[0])
-        alpha = int(lines[1])
-        beta = int(lines[2])
-        a = int(lines[3])
 
-        pub_key = (p, alpha, beta)
-        priv_key = (p, a)
+        pub_key = tuple([int(l) for l in lines[:pub_count]])
+        priv_key = tuple([p] + [int(l) for l in lines[pub_count:]])
         f.close()
         return (pub_key, priv_key)
     except:
         pub_key, priv_key = generate_keys(bitsize)
-
         f = open(filename, 'w')
-        lines = [pub_key[0], pub_key[1], pub_key[2], priv_key[1]]
+        lines = list(pub_key)+list(priv_key)
         f.writelines([str(l) + '\n' for l in lines])
         
         f.close()
@@ -41,7 +39,7 @@ def load_public_key(filename: str) -> tuple:
     f.close()
     return (p, alpha, beta)
 
-def modinv(a, p):
+def modinv(a: int, p: int) -> int:
     """
     Returns the modular inverse of a modulo p, if it exists.
     """
@@ -52,7 +50,7 @@ def modinv(a, p):
     else:
         return x % p
 
-def xgcd(a, b):
+def xgcd(a: int, b: int) -> tuple:
     """
     Extended Euclidean algorithm. Returns gcd(a, b), x, and y
     such that ax + by = gcd(a, b).
@@ -87,16 +85,22 @@ def generate_keys(bitsize: int) -> tuple:
     return (pub_key, priv_key)
 
 def encrypt(msg: str, pub_key: tuple) -> tuple:
-    msg = utils.str_to_num(msg)
+    hash_val = utils.str_to_num(hash.sha1(msg))
+    # Add random padding to the plaintext message
+    padding = ''.join(random.choices(string.digits, k=len(msg)))
+    padded_msg = padding + msg
+    # Convert padded message to a number
+    padded_num = utils.str_to_num(padded_msg)
+    
     p, alpha, beta = pub_key
 
     k = secrets.randbelow(p-1)
     y1 = pow(alpha, k, p)
-    y2 = (msg * pow(beta, k, p)) % p
-    return (y1, y2)
+    y2 = (padded_num * pow(beta, k, p)) % p
+    return (y1, y2, hash_val)
 
 def decrypt(msg: tuple, priv_key: tuple) -> str:
-    y1, y2 = msg
+    y1, y2, hash_val = msg
     p, a = priv_key
 
     # Compute (y1 ** a) % p
@@ -109,7 +113,16 @@ def decrypt(msg: tuple, priv_key: tuple) -> str:
     decrypted = (y2 * shared_secret_inv) % p
 
     # Convert the decrypted integer to a string representation of the original message
-    return utils.num_to_str(decrypted, p.bit_length())
+    padded_msg = utils.num_to_str(decrypted, p.bit_length())
+    
+    # Remove the padding from the decrypted message
+    padding = padded_msg[:len(padded_msg)//2]
+    plaintext = padded_msg[len(padding):]
+
+    # Check hash for tampering
+    if (utils.str_to_num(hash.sha1(plaintext)) != hash_val): return ""
+    
+    return plaintext
 
 
 def sign(msg: str, priv_key: tuple, pub_key: tuple) -> tuple:

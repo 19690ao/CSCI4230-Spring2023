@@ -346,17 +346,12 @@ class Bank:
             if scheme == 'rsa':
                 client_pubkey = rsa.load_public_key(f"atm_secret/{client_keyname}-rsa.pub")
                 challenge_encrypted = rsa.encrypt(str(challenge), client_pubkey)
-                #print(f"TEMP b2: {challenge}")
             else:
-                #print(f"TEMP b4")
                 client_pubkey = elgamal.load_public_key(f"atm_secret/{client_keyname}-elgamal.pub")
-                #print(f"TEMP b3")
                 challenge_encrypted = elgamal.encrypt(str(challenge), client_pubkey)
-                #print(f"TEMP b2: {challenge}")
         except:
             self.client.close()
             raise Exception('client identifier is invalid')
-        #print(f"TEMP b1: {aes.encrypt(str(challenge_encrypted), self.aeskey).encode('utf-8')}")
         self.client.send(aes.encrypt(str(challenge_encrypted), self.aeskey).encode('utf-8'))  
 
         #if client response is good, accept them
