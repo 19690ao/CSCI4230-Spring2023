@@ -341,11 +341,11 @@ class Bank:
 
         #issue client a challenge to pass (using their own PKC-public key), based on the chosen PKC
         client_keyname = aes.decrypt(self.client.recv(1024).decode('utf-8'), self.aeskey)
-        challenge = format(secrets.randbits(20*8), '040x')
+        challenge = secrets.randbelow(pow(6,40))
         try:
             if scheme == 'rsa':
                 client_pubkey = rsa.load_public_key(f"atm_secret/{client_keyname}-rsa.pub")
-                challenge_encrypted = rsa.encrypt(challenge, client_pubkey)
+                challenge_encrypted = rsa.encrypt(str(challenge), client_pubkey)
             else:
                 client_pubkey = elgamal.load_public_key(f"atm_secret/{client_keyname}-elgamal.pub")
                 challenge_encrypted = elgamal.encrypt(challenge, client_pubkey)
@@ -356,7 +356,7 @@ class Bank:
 
         #if client response is good, accept them
         client_response = aes.decrypt(self.client.recv(1024).decode('utf-8'), self.aeskey)
-        if client_response != hash.sha1(challenge + self.aeskey):
+        if client_response != hash.sha1(str(challenge) + self.aeskey):
             self.client.close()
             raise Exception("client is not an atm")
 

@@ -218,7 +218,7 @@ class ATM:
         #accept the server-issued challenge and try to pass it, based on the chosen PKC and PKC-private keys
         bank_challenge = aes.decrypt(self.s.recv(4096).decode('utf-8'), self.aeskey)
         if scheme == 'rsa':
-            response = rsa.decrypt(int(bank_challenge), privkey)
+            response = rsa.decrypt(bank_challenge, privkey)
         else:
             bank_challenge = bank_challenge.strip('(').strip(')').split(',')
             bank_challenge = [int(c) for c in bank_challenge]

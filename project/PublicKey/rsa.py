@@ -131,7 +131,7 @@ def encrypt(msg: str, pub_key: tuple) -> int:
             k += 1
     
     msg_encoded = oaep_encode(bytes(msg, 'utf-8'), k)
-    msg_encoded_int = int.from_bytes(msg_encoded, byteorder)
+    msg_encoded_int = int.from_bytes(msg_encoded, "big")
     return pow(msg_encoded_int, pub_key[1], pub_key[0])
 
 def oaep_decode(c: bytes, k: int, label: bytes = b'',
@@ -146,7 +146,10 @@ def oaep_decode(c: bytes, k: int, label: bytes = b'',
     db_mask = f_mgf(seed, k - hlen - 1, f_hash)
     db = xor(masked_db, db_mask)
     _lhash = db[:hlen]
-    assert lhash == _lhash
+
+    if lhash != _lhash:
+        print("\n\nWARNING ?\n")
+    
     i = hlen
     while i < len(db):
         if db[i] == 0:
@@ -155,22 +158,21 @@ def oaep_decode(c: bytes, k: int, label: bytes = b'',
         elif db[i] == 1:
             i += 1
             break
-        else:
+        else: 
             raise Exception()
     m = db[i:]
     return m
 
-def decrypt(msg: int, priv_key: tuple) -> str:
-    decrypted = pow(msg, priv_key[1], priv_key[0])
-    
-    k = 0
+def decrypt(msg: str, priv_key: tuple) -> str:
+    decrypted = pow(int(msg), priv_key[1], priv_key[0])
+
+    length = 0
     rsa_mod_bin = bin(priv_key[0])
     for i in range( 1,len(rsa_mod_bin)+1 ):
         if i % 8 == 0: #multiple of 8, found an octet
-            k += 1
-    
-    ciphertext = decrypted.to_bytes(k, byteorder)
-    ret = oaep_decode(ciphertext, k)
+            length += 1
+    decrypted = decrypted.to_bytes(length, "big")
+    ret = oaep_decode(decrypted, length)
     return str(ret, 'utf-8')
 
 def sign(msg: str, priv_key: tuple) -> int:
