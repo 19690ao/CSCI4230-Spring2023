@@ -24,7 +24,7 @@ class Bank:
         self.failedlogins = {username: 0 for username in self.usertopass.keys()}
 
         # Set up public key encryption methods
-        self.methods = ['rsa'] 
+        self.methods = ['rsa', 'elgamal'] 
         print("Public key methods in use by bank --> ", self.methods)
 
         # Initialize AES and MAC keys
@@ -297,7 +297,7 @@ class Bank:
         if scheme == "rsa":
             keypairs = rsa.load_keys("atm_secret/bank-rsa.txt", 4096)
         else:
-            keypairs = elgamal.load_keys("atm_secret/bank-elgamal.txt", 1024)
+            keypairs = elgamal.load_keys("atm_secret/bank-elgamal.txt", 4096)
         pubkey = keypairs[0]
         privkey = keypairs[1]
         self.client.send(scheme.encode('utf-8'))
@@ -346,12 +346,17 @@ class Bank:
             if scheme == 'rsa':
                 client_pubkey = rsa.load_public_key(f"atm_secret/{client_keyname}-rsa.pub")
                 challenge_encrypted = rsa.encrypt(str(challenge), client_pubkey)
+                #print(f"TEMP b2: {challenge}")
             else:
+                #print(f"TEMP b4")
                 client_pubkey = elgamal.load_public_key(f"atm_secret/{client_keyname}-elgamal.pub")
-                challenge_encrypted = elgamal.encrypt(challenge, client_pubkey)
+                #print(f"TEMP b3")
+                challenge_encrypted = elgamal.encrypt(str(challenge), client_pubkey)
+                #print(f"TEMP b2: {challenge}")
         except:
             self.client.close()
             raise Exception('client identifier is invalid')
+        #print(f"TEMP b1: {aes.encrypt(str(challenge_encrypted), self.aeskey).encode('utf-8')}")
         self.client.send(aes.encrypt(str(challenge_encrypted), self.aeskey).encode('utf-8'))  
 
         #if client response is good, accept them
