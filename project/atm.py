@@ -231,5 +231,5 @@ class ATM:
         self.post_handshake()
 
 if __name__ == "__main__":
-    atmtest2 = ATM(["elgamal"])
+    atmtest2 = ATM(["rsa"])
     atmtest2.starthandshake() 
