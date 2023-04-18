@@ -1,21 +1,5 @@
 import random
 
-def exponentMod(A, B, C):
-    #credit: https://www.geeksforgeeks.org/modular-exponentiation-recursive/     
-    if (A == 0):
-        return 0
-    if (B == 0):
-        return 1
-    y = 0
-    if (B % 2 == 0):
-        y = exponentMod(A, B / 2, C)
-        y = (y * y) % C
-    else:
-        y = A % C
-        y = (y * exponentMod(A, B - 1,
-                             C) % C) % C
-    return ((y + C) % C)
-
 def gcdExtended(a, b):
     #credit: https://www.geeksforgeeks.org/python-program-for-basic-and-extended-euclidean-algorithms-2/
     if a == 0 :
@@ -54,8 +38,6 @@ def getInverse(a, b):
 
 def encryptor(plaintext: str, r: int = 35145, g: int = 6497955158, n: int = 293*433) -> int:
     x = pow(g, int(plaintext), n*n)
-    #exponentMod(g, plaintext, n*n)
-    #y = exponentMod(r, n, n*n)
     y = pow(r, n, n*n)
     return exponentMod(x*y, 1, n*n)
 
@@ -64,13 +46,10 @@ def add(p1: str, p2: str, r: int = 35145, g: int = 6497955158, n: int = 293*433)
     encrypted_p1 = encryptor(p1, r, g, n)
     encrypted_p2 = encryptor(p2, r, g, n)
     product = encrypted_p1*encrypted_p2
-    #print("Current value before being decrypted is " + str(product))
-    #return exponentMod( decryptor(product, g, n), 1, n*n )
     return pow( decryptor(product, g, n), 1, n*n )
 
 def decryptor(ciphertext: int , g: int = 6497955158, n: int = 293*433) -> int:
     u = 53022
-    #thing2 = exponentMod(ciphertext, carmichael(n), n*n)
     thing2 = pow(ciphertext, carmichael(n), n*n)
     thing2 = L(thing2, n)
 
