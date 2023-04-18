@@ -6,6 +6,7 @@ import secrets
 from PublicKey import rsa
 from PublicKey import elgamal
 from PrivateKey import aes
+import paillier
 
 class ATM:
     def __init__(self, preflist = []):
@@ -16,25 +17,33 @@ class ATM:
         if len(preflist) == 0:
             raise Exception("need to have preferences as the user to compare to server...")
         self.prefs = preflist
-        self.counter = 1
+        self.encrypted_counter = 1
         self.id_num = 0
         self.s = socket.socket()
         self.s.connect(('127.0.0.1', 9999))
 
     def countercheck(self, msg):
-        if(int(msg[0]) <= self.counter):
+        left = paillier.decryptor(int(msg[0]))
+        right = paillier.decryptor(self.encrypted_counter)   
+        if(left <= right):
             raise Exception("counter check failed or msg tampered with")
 
-        self.counter = int(msg[0]) + 1
+        self.encrypted_counter = paillier.encryptor( paillier.add(str(left), "1") )
 
     def post_handshake(self):
         #create a random number as the counter and send it (along with its proper hash)
-        self.counter = secrets.randbelow(pow(2, 2048))
-        sendstr = str(self.counter)
-        sendstr = aes.encrypt(str(self.counter) + "-" + hash.hmac(sendstr, self.mackey), self.aeskey)
-        self.s.send(sendstr.encode('utf-8'))
+        #encrypt the counter with paillier algorithm
 
-        # Ensure bank correctly received our counter....helps integrity
+        r = secrets.randbelow(100)
+        self.encrypted_counter = paillier.encryptor(str(r))
+        
+        sendstr = str(self.encrypted_counter)
+        h = hash.hmac(sendstr, self.mackey)
+        sendstr = aes.encrypt(str(self.encrypted_counter) + "-" + h, self.aeskey)
+        self.s.send(sendstr.encode('utf-8'))
+        #note: the hashing depnds on the paillier encryption of the counter, not the counter itself
+
+        # Ensure bank correctly received our encrypted_counter....helps integrity
         bankret = self.s.recv(99999).decode('utf-8')
         bankret = aes.decrypt(bankret, self.aeskey)
         bankret = bankret.split('-')
@@ -49,7 +58,6 @@ class ATM:
         bankret.remove(chkhash)
         againsthash = '-'.join(bankret)
         bankret = bankret[1:]
-
         if hash.hmac(againsthash, self.mackey) != chkhash:
             print("bank return msg integrity compromised")
             self.s.close()
@@ -66,7 +74,7 @@ class ATM:
             username = input("username: ")
             password = input("password: ")
             sendstr = username + '-' + hash.sha1(password)
-            sendstr = str(self.counter) + '-' + sendstr
+            sendstr = str(self.encrypted_counter) + '-' + sendstr
             sendstr = aes.encrypt(sendstr + "-" + hash.hmac(sendstr, self.mackey), self.aeskey)
             self.s.send(sendstr.encode('utf-8'))
             bankret = self.s.recv(99999).decode('utf-8')
@@ -127,16 +135,15 @@ class ATM:
                 print("invalid money amount")
                 continue
 
-            sendstr = str(self.counter) + '-' + sendstr
+            sendstr = str(self.encrypted_counter) + '-' + sendstr
             sendstr = aes.encrypt(sendstr + "-" + hash.hmac(sendstr, self.mackey), self.aeskey)
             self.s.send(sendstr.encode('utf-8'))
 
             bankret = self.s.recv(99999).decode('utf-8')#parse this out
             bankret = aes.decrypt(bankret, self.aeskey)
             bankret = bankret.split('-')
-
             try:
-                self.countercheck(bankret)
+                self.countercheck(bankret) #FAILING FOR SOME REASON
             except Exception as e:
                 print(str(e))
                 continue

@@ -6,6 +6,7 @@ import secrets
 from PublicKey import rsa
 from PublicKey import elgamal
 from PrivateKey import aes
+import paillier
 
 class Bank:
     def __init__(self):
@@ -32,7 +33,7 @@ class Bank:
         self.mackey = None
 
         # Initialize counter for message sequence numbers
-        self.counter = 0
+        self.encrypted_counter = 0
 
         # Set large prime number
         self.p = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
@@ -49,15 +50,15 @@ class Bank:
 
     def countercheck(self, msg):
         # Extract message sequence number from first element of message
-        seq_num = int(msg[0])
+        seq_num = paillier.decryptor(int(msg[0]))
 
         # Check that sequence number is greater than current counter value
-        if seq_num <= self.counter:
+        if seq_num <= paillier.decryptor(self.encrypted_counter):
             # Raise exception if sequence number is out of order or message has been tampered with
             raise Exception("Message out of order or tampered with")
 
         # Update counter with new sequence number
-        self.counter = seq_num + 1
+        self.encrypted_counter = paillier.encryptor(paillier.add(seq_num, 1))
 
     def withdraw(self, usr, amt):
         # Start building response message with user ID
@@ -74,7 +75,7 @@ class Bank:
             sendback += self.usertomoney[usr] + '-' + "withdraw successful"
 
         # Add message sequence number and encrypt message
-        sendback = str(self.counter) + '-' + sendback
+        sendback = str(self.encrypted_counter) + '-' + sendback
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
 
         # Send encrypted message to client
@@ -90,7 +91,7 @@ class Bank:
         sendback += self.usertomoney[usr] + '-' + "deposit successful"
 
         # Add message sequence number and encrypt message
-        sendback = str(self.counter) + '-' + sendback
+        sendback = str(self.encrypted_counter) + '-' + sendback
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
 
         # Send encrypted message to client
@@ -102,7 +103,7 @@ class Bank:
         sendback += self.usertomoney[usr] + '-' + "check successful"
 
         # Add message sequence number and encrypt message
-        sendback = str(self.counter) + '-' + sendback
+        sendback = str(self.encrypted_counter) + '-' + sendback
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
 
         # Send encrypted message to client
@@ -140,7 +141,7 @@ class Bank:
             # Verify the integrity of the received message
             if chkhash != hash.hmac(againsthash, self.mackey):
                 sendback = 'notverifieduser-0-message tampered'
-                sendback = str(self.counter) + '-' + sendback
+                sendback = str(self.encrypted_counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
                 continue
@@ -150,7 +151,7 @@ class Bank:
             username = cmd[0]
             if username not in self.usertopass:
                 sendback = "notverifieduser-0-username not known in bank"
-                sendback = str(self.counter) + '-' + sendback
+                sendback = str(self.encrypted_counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
                 continue
@@ -158,7 +159,7 @@ class Bank:
             # Check if the account is locked
             if self.failedlogins[username] >= 5:
                 sendback = "notverifieduser-0-account locked (too many login attempts)"
-                sendback = str(self.counter) + '-' + sendback
+                sendback = str(self.encrypted_counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
                 continue
@@ -167,7 +168,7 @@ class Bank:
             password = cmd[1]
             if password != self.usertopass[username]:
                 sendback = username + "-0-password not matching in bank"
-                sendback = str(self.counter) + '-' + sendback
+                sendback = str(self.encrypted_counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
                 self.failedlogins[username] += 1
@@ -178,7 +179,7 @@ class Bank:
             loginname = username
             sendback = loginname + "-"
             sendback += self.usertomoney[loginname] + '-' + "login successful"
-            sendback = str(self.counter) + '-' + sendback
+            sendback = str(self.encrypted_counter) + '-' + sendback
             sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
             self.client.send(sendback.encode('utf-8'))
         
@@ -233,7 +234,7 @@ class Bank:
             else:
                 sendback = loginname + "-"
                 sendback += self.usertomoney[loginname] + '-' + "invalid command"
-                sendback = str(self.counter) + '-' + sendback
+                sendback = str(self.encrypted_counter) + '-' + sendback
                 sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
                 self.client.send(sendback.encode('utf-8'))
 
@@ -246,20 +247,28 @@ class Bank:
         # Extract the random number and its hash
         chkhash = count[-1]
         count.remove(chkhash)
-        againsthash = '-'.join(count)
+        againsthash = '-'.join(count)  #should be the counter generated by and received from client
+        #print("received an encryted counter of "+ str(againsthash))
+
+        h = hash.hmac(againsthash, self.mackey)
 
         # Verify the integrity of the received message
-        if hash.hmac(againsthash, self.mackey) != chkhash:
+        if h != chkhash:
             sendback = "notverifieduser-0-msg integrity compromised"
             sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
             self.client.send(sendback.encode('utf-8'))
             return
 
         # Update the counter with the received value
-        self.counter = int(count[0]) + 1
+        plaintext_counter = paillier.decryptor(int(againsthash))
+        #print("the actual counter value in plaintext is " + str(plaintext_counter)) #should match atm's r
+        plaintext_counter_incremented = paillier.add(str(plaintext_counter), "1")
+        self.encrypted_counter = paillier.encryptor(plaintext_counter_incremented)
+        #print("new encryped counter is " + str(self.encrypted_counter) + " which decrypts to " + str(paillier.decryptor(self.encrypted_counter)))
+        #self.counter = int(count[0]) + 1
 
-        # Send a message back to the client with the updated counter
-        sendback = str(self.counter) + '-' + "counter exchange successful"
+        # Send a message back to the client with the updated (encrypted) counter
+        sendback = str(self.encrypted_counter) + '-' + "counter exchange successful"
         sendback = aes.encrypt(sendback + '-' + hash.hmac(sendback, self.mackey), self.aeskey)
         self.client.send(sendback.encode('utf-8'))
 
